@@ -8,70 +8,102 @@ import java.util.Scanner;
 
 public class Asm2 {
     public static String accountFile = "src\\main\\java\\account\\account.txt";
-    public static HashMap<String, String> accounts = new HashMap<String, String>();   
+    public static HashMap<String, String> accounts = new HashMap<String, String>();  
+    public static String rightPassword = null;
+    public static String loginErrorMessage = "Error Require login";
+    public static String loginSuccessMessage = "Ok Logout successful. Client stopped!";
     
     public static void main(String argv[]) throws IOException
     {
-        readFromFile();
+        accounts = readFromFile(accountFile);
         connectToClient();
-//        System.out.print(checkAccount("an"));
     }
     
     private static void connectToClient() throws IOException
-    {
-        String sentence_from_client;
-        String sentence_to_client;
-        String rightPassword;
-        
-        //Tạo socket server, chờ tại cổng '5555'
+    { 
+        int isLogin = 0;
+        //Socket server
         ServerSocket welcomeSocket = new ServerSocket(5555);
         
-        while(true) {
-            //chờ yêu cầu từ client
-            Socket connectionSocket = welcomeSocket.accept();
-            
-            //Tạo input stream, nối tới Socket
+        //Wait from client
+        Socket connectionSocket = welcomeSocket.accept();
+        
+        while(true)
+        {
+            //Input stream with Socket
             BufferedReader inFromClient =
                 new BufferedReader(new
                     InputStreamReader(connectionSocket.getInputStream())); 
-            
-            //Tạo outputStream, nối tới socket
+
+            //OutputStream with Socket
             DataOutputStream outToClient =
                 new DataOutputStream(connectionSocket.getOutputStream());
-            
-            //Đọc thông tin từ socket
-            String account = inFromClient.readLine();
-            rightPassword = checkAccount(account) +" (Server accepted!)" + '\n';
 
-            //ghi dữ liệu ra socket
-            outToClient.writeBytes(rightPassword); 
-            
-            //More
-            String password = inFromClient.readLine();
-            if(password == rightPassword)
+            //Check account
+            String value = inFromClient.readLine();
+            String[] values = value.split(" ", 2);
+            String header = values[0];
+        
+            if(header.equals("Account"))
             {
-                sentence_to_client = password +" (Server accepted!)" + '\n';
+                outToClient.write(checkAccount(values[1]));
             }
-            else
+            else if(header.equals("Password"))
             {
-                sentence_to_client = password +" (Server not accepted!)" + '\n';
+                isLogin = checkPassword(values[1]);
+                outToClient.write(isLogin);
             }
-            
-            outToClient.writeBytes(sentence_to_client);
-            
-            return;
+            else if(header.equals("LOGOUT"))
+            {
+                if(isLogin == 0)
+                {
+                    outToClient.writeBytes(loginErrorMessage + '\n');
+                }
+                else
+                {
+                    isLogin = 0;
+                    outToClient.writeBytes(loginSuccessMessage + '\n');
+                }
+                return;
+            }
+            else 
+            {
+                if(isLogin == 0)
+                {
+                    outToClient.writeBytes(loginErrorMessage);
+                }
+                else
+                {
+                    outToClient.writeBytes(values[1] + '\n');
+                }
+            }
         }
     }
 
-    private static String checkAccount(String accountInput)
+    private static int checkAccount(String accountInput)
     {
-        return accounts.get(accountInput);
+        rightPassword = accounts.get(accountInput);
+        if(rightPassword != null)
+        {
+            return 1;
+        }
+        return 0;
+    };
+    
+    private static int checkPassword(String password)
+    {
+        if(password.equals(rightPassword))
+        {
+            return 1;
+        }
+        return 0;
     }
     
-    private static void readFromFile()
+    private static HashMap<String, String> readFromFile(String accountFileName)
     {
+        HashMap<String, String> accounts = new HashMap<String, String>(); 
         try {
-          File myObj = new File(accountFile);
+          File myObj = new File(accountFileName);
           Scanner myReader = new Scanner(myObj);
           while (myReader.hasNextLine()) {
             String data = myReader.nextLine();
@@ -80,9 +112,10 @@ public class Asm2 {
           }
           myReader.close();
         } catch (FileNotFoundException e) {
-          System.out.println("An error occurred.");
+          System.out.println("Cannot read from data");
           e.printStackTrace();
         }
+        return accounts;
     }
 }
 
